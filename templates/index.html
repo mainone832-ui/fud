@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Package Processor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      color: #222;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: #666;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"],
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    input[type="text"]:focus,
+    input[type="file"]:focus {
+      outline: none;
+      border-color: #666;
+    }
+
+    .note {
+      font-size: 12px;
+      color: #777;
+      margin-top: 5px;
+    }
+
+    .file-info {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #555;
+    }
+
+    button {
+      width: 100%;
+      padding: 11px;
+      font-size: 15px;
+      border: none;
+      border-radius: 6px;
+      background: #222;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #000;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .progress {
+      display: none;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #444;
+      text-align: center;
+    }
+
+    .result {
+      display: none;
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .result.success {
+      display: block;
+      background: #eaf7ea;
+      border: 1px solid #b7d8b7;
+      color: #1f5d1f;
+    }
+
+    .result.error {
+      display: block;
+      background: #fdecec;
+      border: 1px solid #efb4b4;
+      color: #a12626;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pel do apk ko</h1>
+    <div class="subtitle">Upload file and process it</div>
+
+    <form id="encryptForm">
+      <div class="form-group">
+        <label for="packageName">Package Name</label>
+        <input
+          type="text"
+          id="packageName"
+          name="package_name"
+          value="com.android.mrobot"
+          placeholder="com.example.app"
+          required
+        />
+        <div class="note">Used for key derivation</div>
+      </div>
+
+      <div class="form-group">
+        <label for="apkFile">Select File</label>
+        <input
+          type="file"
+          id="apkFile"
+          name="apk_file"
+          accept=".apk,.zip,.bin"
+          required
+        />
+        <div class="file-info" id="fileInfo">No file selected</div>
+      </div>
+
+      <button type="submit" id="encryptBtn">Process File</button>
+    </form>
+
+    <div class="progress" id="progress">Processing... please wait</div>
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById("encryptForm");
+    const progress = document.getElementById("progress");
+    const resultDiv = document.getElementById("result");
+    const encryptBtn = document.getElementById("encryptBtn");
+    const fileInput = document.getElementById("apkFile");
+    const fileInfo = document.getElementById("fileInfo");
+    const packageNameInput = document.getElementById("packageName");
+
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+
+      if (!file) {
+        fileInfo.textContent = "No file selected";
+        return;
+      }
+
+      const sizeKB = file.size / 1024;
+      const sizeText =
+        sizeKB < 1024
+          ? `${sizeKB.toFixed(2)} KB`
+          : `${(sizeKB / 1024).toFixed(2)} MB`;
+
+      fileInfo.textContent = `${file.name} (${sizeText})`;
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const packageName = packageNameInput.value.trim();
+      const file = fileInput.files[0];
+
+      if (!packageName) {
+        showResult("Please enter package name.", "error");
+        return;
+      }
+
+      if (!file) {
+        showResult("Please select a file.", "error");
+        return;
+      }
+
+      progress.style.display = "block";
+      encryptBtn.disabled = true;
+      resultDiv.style.display = "none";
+      resultDiv.className = "result";
+
+      const formData = new FormData();
+      formData.append("package_name", packageName);
+      formData.append("apk_file", file);
+
+      try {
+        const response = await fetch("/encrypt", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          let errorMessage = "Something went wrong.";
+
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (_) {}
+
+          showResult(errorMessage, "error");
+          return;
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+
+        a.href = url;
+        a.download = "ṩỹṧ꙱ṫḗṃ.tmp";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        showResult("Processing completed successfully. File downloaded.", "success");
+      } catch (error) {
+        showResult("Request failed: " + escapeHtml(error.message || "Unknown error"), "error");
+      } finally {
+        progress.style.display = "none";
+        encryptBtn.disabled = false;
+      }
+    });
+
+    function showResult(message, type) {
+      resultDiv.className = `result ${type}`;
+      resultDiv.innerHTML = message;
+      resultDiv.style.display = "block";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
