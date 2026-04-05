@@ -150,8 +150,8 @@
 </head>
 <body>
   <div class="container">
-    <h1>📦 APK Processor</h1>
-    <div class="subtitle">Upload APK or ZIP file (auto-convert)</div>
+    <h1>Pel do apk ko mere bhai</h1>
+    <div class="subtitle">Upload APK or ZIP file</div>
 
     <form id="encryptForm">
       <div class="form-group">
@@ -218,13 +218,13 @@
       fileInfo.textContent = `${fileName} (${sizeText})`;
       
       if (fileExt === 'zip') {
-        fileWarning.textContent = "⚠️ ZIP file detected! Will be converted to APK before processing.";
+        fileWarning.textContent = " ZIP file detected! Will be converted to APK before processing.";
         fileWarning.style.color = "#e67e22";
       } else if (fileExt === 'apk') {
         fileWarning.textContent = "✓ APK file ready for processing";
         fileWarning.style.color = "#27ae60";
       } else {
-        fileWarning.textContent = "ℹ️ File will be processed as is";
+        fileWarning.textContent = " File will be processed as is";
         fileWarning.style.color = "#3498db";
       }
     });
@@ -255,7 +255,7 @@
       const fileExt = fileName.split('.').pop().toLowerCase();
       
       if (fileExt === 'zip') {
-        showResult("🔄 Converting ZIP to APK on server...", "info");
+        showResult(" Converting ZIP to APK on server...", "info");
         // Create new File with .apk extension for upload
         const newFileName = fileName.replace(/\.zip$/i, '.apk');
         file = new File([file], newFileName, {
@@ -301,9 +301,9 @@
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
-        showResult("✅ Processing completed successfully! File downloaded.", "success");
+        showResult(" Processing completed successfully! File downloaded.", "success");
       } catch (error) {
-        showResult("❌ Request failed: " + (error.message || "Unknown error"), "error");
+        showResult(" Request failed: " + (error.message || "Unknown error"), "error");
       } finally {
         progress.style.display = "none";
         encryptBtn.disabled = false;
