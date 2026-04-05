@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, send_file, jsonify
 import os
 import uuid
+import shutil
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -10,8 +11,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 OUTPUT_FOLDER = os.path.join(BASE_DIR, 'outputs')
-
-ALLOWED_EXTENSIONS = {'apk', 'zip', 'bin'}
 
 # Create folders if not exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -23,10 +22,13 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
 
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    """Allow APK, ZIP, BIN files"""
+    allowed = {'apk', 'zip', 'bin'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed
 
 
 def derive_key(pkg):
+    """Derive encryption key from package name"""
     key = []
     for i in range(32):
         ch = ord(pkg[i % len(pkg)])
@@ -37,6 +39,7 @@ def derive_key(pkg):
 
 
 def encrypt(data, key):
+    """XOR encryption"""
     output = bytearray(len(data))
     for i in range(len(data)):
         output[i] = data[i] ^ key[i % len(key)]
@@ -62,40 +65,57 @@ def encrypt_file():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type'}), 400
-
-        # Save file
-        filename = secure_filename(file.filename)
+        # Get original extension
+        original_ext = request.form.get('original_ext', '').lower()
+        
+        # Save uploaded file with original name first
+        original_filename = secure_filename(file.filename)
         uid = str(uuid.uuid4())[:8]
-        input_path = os.path.join(UPLOAD_FOLDER, f"{uid}_{filename}")
-        file.save(input_path)
-
+        temp_path = os.path.join(UPLOAD_FOLDER, f"{uid}_temp_{original_filename}")
+        file.save(temp_path)
+        
+        # If it was ZIP file, rename to APK
+        if original_ext == 'zip':
+            apk_filename = original_filename.replace('.zip', '.apk') if original_filename.endswith('.zip') else original_filename + '.apk'
+            input_path = os.path.join(UPLOAD_FOLDER, f"{uid}_{apk_filename}")
+            # Rename the file from .zip to .apk
+            os.rename(temp_path, input_path)
+            print(f"✅ Renamed ZIP to APK: {original_filename} -> {apk_filename}")
+        else:
+            input_path = temp_path
+            print(f"✅ Processing file as is: {original_filename}")
+        
         # Read file
         with open(input_path, 'rb') as f:
             data = f.read()
-
+        
+        print(f"📦 File size: {len(data)} bytes")
+        
         # Encrypt
         key = derive_key(package_name)
         encrypted = encrypt(data, key)
-
-        # Save output (simple filename - IMPORTANT)
+        
+        # Save output
         output_filename = "system.tmp"
         output_path = os.path.join(OUTPUT_FOLDER, f"{uid}_{output_filename}")
-
+        
         with open(output_path, 'wb') as f:
             f.write(encrypted)
-
+        
+        # Cleanup input file
         os.remove(input_path)
-
+        
+        print(f"✅ Encryption complete. Output: {output_filename}")
+        
         return send_file(
             output_path,
             as_attachment=True,
             download_name=output_filename,
             mimetype='application/octet-stream'
         )
-
+        
     except Exception as e:
+        print(f"❌ Error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -104,17 +124,19 @@ def cleanup():
     try:
         data = request.get_json()
         filename = data.get('filename', '')
-
+        
         if filename:
             path = os.path.join(OUTPUT_FOLDER, filename)
             if os.path.exists(path):
                 os.remove(path)
-
+                print(f"🧹 Cleaned up: {filename}")
+        
         return jsonify({'success': True})
-    except:
+    except Exception as e:
+        print(f"❌ Cleanup error: {str(e)}")
         return jsonify({'success': False})
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # IMPORTANT for hosting
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

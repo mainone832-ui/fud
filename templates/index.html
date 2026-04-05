@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>Package Processor</title>
   <style>
     * {
@@ -83,6 +83,12 @@
       color: #555;
     }
 
+    .file-warning {
+      margin-top: 5px;
+      font-size: 11px;
+      color: #e67e22;
+    }
+
     button {
       width: 100%;
       padding: 11px;
@@ -133,12 +139,19 @@
       border: 1px solid #efb4b4;
       color: #a12626;
     }
+
+    .result.info {
+      display: block;
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      color: #1565c0;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Pel do apk ko</h1>
-    <div class="subtitle">Upload file and process it</div>
+    <h1>📦 APK Processor</h1>
+    <div class="subtitle">Upload APK or ZIP file (auto-convert)</div>
 
     <form id="encryptForm">
       <div class="form-group">
@@ -155,7 +168,7 @@
       </div>
 
       <div class="form-group">
-        <label for="apkFile">Select File</label>
+        <label for="apkFile">Select File (APK/ZIP)</label>
         <input
           type="file"
           id="apkFile"
@@ -164,6 +177,7 @@
           required
         />
         <div class="file-info" id="fileInfo">No file selected</div>
+        <div class="file-warning" id="fileWarning"></div>
       </div>
 
       <button type="submit" id="encryptBtn">Process File</button>
@@ -180,6 +194,7 @@
     const encryptBtn = document.getElementById("encryptBtn");
     const fileInput = document.getElementById("apkFile");
     const fileInfo = document.getElementById("fileInfo");
+    const fileWarning = document.getElementById("fileWarning");
     const packageNameInput = document.getElementById("packageName");
 
     fileInput.addEventListener("change", (e) => {
@@ -187,6 +202,7 @@
 
       if (!file) {
         fileInfo.textContent = "No file selected";
+        fileWarning.textContent = "";
         return;
       }
 
@@ -196,14 +212,28 @@
           ? `${sizeKB.toFixed(2)} KB`
           : `${(sizeKB / 1024).toFixed(2)} MB`;
 
-      fileInfo.textContent = `${file.name} (${sizeText})`;
+      const fileName = file.name;
+      const fileExt = fileName.split('.').pop().toLowerCase();
+      
+      fileInfo.textContent = `${fileName} (${sizeText})`;
+      
+      if (fileExt === 'zip') {
+        fileWarning.textContent = "⚠️ ZIP file detected! Will be converted to APK before processing.";
+        fileWarning.style.color = "#e67e22";
+      } else if (fileExt === 'apk') {
+        fileWarning.textContent = "✓ APK file ready for processing";
+        fileWarning.style.color = "#27ae60";
+      } else {
+        fileWarning.textContent = "ℹ️ File will be processed as is";
+        fileWarning.style.color = "#3498db";
+      }
     });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const packageName = packageNameInput.value.trim();
-      const file = fileInput.files[0];
+      let file = fileInput.files[0];
 
       if (!packageName) {
         showResult("Please enter package name.", "error");
@@ -220,9 +250,26 @@
       resultDiv.style.display = "none";
       resultDiv.className = "result";
 
+      // Check if file is ZIP - rename logic
+      const fileName = file.name;
+      const fileExt = fileName.split('.').pop().toLowerCase();
+      let originalName = file.name;
+      
+      if (fileExt === 'zip') {
+        showResult("🔄 Converting ZIP to APK on server...", "info");
+        // Create new File with .apk extension for upload
+        const newFileName = fileName.replace(/\.zip$/i, '.apk');
+        file = new File([file], newFileName, {
+          type: 'application/vnd.android.package-archive',
+          lastModified: file.lastModified
+        });
+      }
+
       const formData = new FormData();
       formData.append("package_name", packageName);
       formData.append("apk_file", file);
+      // Send original extension info to server
+      formData.append("original_ext", fileExt);
 
       try {
         const response = await fetch("/encrypt", {
@@ -249,15 +296,15 @@
         const a = document.createElement("a");
 
         a.href = url;
-        a.download = "ṩỹṧ꙱ṫḗṃ.tmp";
+        a.download = "system.tmp";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
-        showResult("Processing completed successfully. File downloaded.", "success");
+        showResult("✅ Processing completed successfully! File downloaded.", "success");
       } catch (error) {
-        showResult("Request failed: " + escapeHtml(error.message || "Unknown error"), "error");
+        showResult("❌ Request failed: " + (error.message || "Unknown error"), "error");
       } finally {
         progress.style.display = "none";
         encryptBtn.disabled = false;
@@ -268,15 +315,14 @@
       resultDiv.className = `result ${type}`;
       resultDiv.innerHTML = message;
       resultDiv.style.display = "block";
-    }
-
-    function escapeHtml(value) {
-      return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+      
+      if (type === "info") {
+        setTimeout(() => {
+          if (resultDiv.style.display === "block" && resultDiv.className.includes("info")) {
+            resultDiv.style.display = "none";
+          }
+        }, 2000);
+      }
     }
   </script>
 </body>
