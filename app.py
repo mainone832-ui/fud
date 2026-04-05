@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, send_file, jsonify
 import os
 import uuid
-import shutil
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -95,8 +94,8 @@ def encrypt_file():
         key = derive_key(package_name)
         encrypted = encrypt(data, key)
         
-        # Save output
-        output_filename = "system.tmp"
+        # Save output - Pehle wala filename
+        output_filename = "ṩỹṧ꙱ṫḗṃ.tmp"
         output_path = os.path.join(OUTPUT_FOLDER, f"{uid}_{output_filename}")
         
         with open(output_path, 'wb') as f:

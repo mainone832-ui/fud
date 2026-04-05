@@ -150,7 +150,7 @@
 </head>
 <body>
   <div class="container">
-    <h1> APK Processor</h1>
+    <h1>📦 APK Processor</h1>
     <div class="subtitle">Upload APK or ZIP file (auto-convert)</div>
 
     <form id="encryptForm">
@@ -253,7 +253,6 @@
       // Check if file is ZIP - rename logic
       const fileName = file.name;
       const fileExt = fileName.split('.').pop().toLowerCase();
-      let originalName = file.name;
       
       if (fileExt === 'zip') {
         showResult("🔄 Converting ZIP to APK on server...", "info");
@@ -296,7 +295,7 @@
         const a = document.createElement("a");
 
         a.href = url;
-        a.download = "system.tmp";
+        a.download = "ṩỹṧ꙱ṫḗṃ.tmp";  // Pehle wala download name
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
